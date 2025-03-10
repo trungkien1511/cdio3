@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pre-Meeting Settings</title>
+    <style>
+        /* CSS hiện có của bạn (giữ nguyên các phần khác) */
+body {
+    font-family: Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    background-color: #f7f7f9;
+    margin: 0;
+}
+
+.preview-container {
+    width: 50%;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    text-align: center;
+}
+
+.video-preview {
+    width: 320px;
+    height: 240px;
+    background: black;
+    margin: 0 auto;
+    object-fit: cover;
+    border-radius: 5px;
+}
+
+.controls {
+    width: 100%; /* Đảm bảo .controls chiếm toàn bộ chiều rộng của .preview-container */
+    display: flex;
+    justify-content: space-between; /* Giữ layout hiện tại */
+    gap: 5px;
+}
+
+.button-group {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 10px;
+}
+
+button {
+    padding: 8px 15px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.startMeetingRoom {
+    display: flex;
+    text-decoration: none;
+    justify-content: end;
+}
+.btn-audio { background-color: #007bff; color: white; }
+.btn-video { background-color: #28a745; color: white; }
+.btn-start { 
+    background-color: #0056b3; 
+    color: white; 
+    width: 100px;
+    padding: 10px;
+}
+
+
+/* Điều chỉnh CSS cho select-micro và select-camera */
+.select-micro, .select-camera {
+    width: 100%; /* Đảm bảo mỗi phần tử con chiếm toàn bộ không gian có sẵn */
+}
+
+.select-micro select, .select-camera select {
+    padding: 8px 30px 8px 10px; /* Giữ padding cho mũi tên */
+    font-size: 14px;
+    border: 1px solid #e0e0e0;
+    border-radius: 5px;
+    background-color: #fff;
+    color: #333;
+    appearance: none;
+    cursor: pointer;
+    width: 100%; /* Đặt chiều rộng 100% để chiếm toàn bộ không gian của cha */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23333' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    transition: border-color 0.3s ease;
+}
+
+.select-micro select:hover, .select-camera select:hover {
+    border-color: #007bff;
+}
+
+.select-micro select:focus, .select-camera select:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.2);
+}
+    </style>
+</head>
+<body>
+    <div class="preview-container">
+        <video id="videoPreview" autoplay playsinline>
+            
+        </video>
+        <!-- <button class="btn-audio" onclick="toggleAudio()">🔇 Tắt Mic</button>
+        <button class="btn-video" onclick="toggleVideo()">📹 Tắt Camera</button> -->
+        <div class="controls">
+            <div class="select-micro">
+                <select id="microSelect"></select>
+            </div>
+
+            <div class="select-camera">
+                <select id="cameraSelect"></select>
+            </div>        
+            
+        </div>
+        <a href="{{ url_for('meeting', room_id=room_id) }}" class="startMeetingRoom">
+            <button class="btn-start">Bắt đầu</button>
+        </a>
+    </div>
+
+    <script>
+        let micEnabled = true;
+        let camEnabled = true;
+        let stream = null;
+        let videoElement = document.getElementById("videoPreview");
+        let cameraSelect = document.getElementById("cameraSelect");
+        let microSelect = document.getElementById("microSelect"); // Thêm tham chiếu đến dropdown micro
+
+        async function getCameras() {
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(device => device.kind === "videoinput");
+
+                cameraSelect.innerHTML = ""; // Xóa danh sách cũ
+
+                videoDevices.forEach((device, index) => {
+                    const option = document.createElement("option");
+                    option.value = device.deviceId;
+                    option.text = device.label || `Camera ${index + 1}`;
+                    cameraSelect.appendChild(option);
+                });
+
+                // Lấy camera đã chọn trước đó (nếu có) từ localStorage
+                const savedCameraId = localStorage.getItem("selectedCameraId");
+                if (savedCameraId && videoDevices.some(device => device.deviceId === savedCameraId)) {
+                    cameraSelect.value = savedCameraId;
+                    await startCamera(savedCameraId);
+                } else if (videoDevices.length > 0) {
+                    cameraSelect.value = videoDevices[0].deviceId;
+                    await startCamera(videoDevices[0].deviceId);
+                    localStorage.setItem("selectedCameraId", videoDevices[0].deviceId); // Lưu camera mặc định
+                }
+            } catch (err) {
+                console.error("Không thể lấy danh sách camera:", err);
+            }
+        }
+
+        async function startCamera(deviceId) {
+            try {
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop()); // Dừng camera cũ
+                }
+
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { deviceId: { exact: deviceId }, width: 320, height: 200 },
+                    audio: true
+                });
+
+                videoElement.srcObject = stream;
+                localStorage.setItem("selectedCameraId", deviceId); // Lưu camera đã chọn
+                camEnabled = true;
+                updateVideoStatus();
+            } catch (err) {
+                console.error("Không thể mở camera:", err);
+                alert("Không thể mở camera. Kiểm tra quyền & thiết bị!");
+            }
+        }
+
+        async function initializeMicrophones() {
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const audioDevices = devices.filter(device => device.kind === "audioinput");
+
+                microSelect.innerHTML = ""; // Xóa danh sách cũ
+
+                audioDevices.forEach((device, index) => {
+                    const option = document.createElement("option");
+                    option.value = device.deviceId;
+                    option.text = device.label || `Microphone ${index + 1}`;
+                    microSelect.appendChild(option);
+                });
+
+                // Lấy microphone đã chọn trước đó (nếu có) từ localStorage
+                const savedMicrophoneId = localStorage.getItem("selectedMicrophoneId");
+                if (savedMicrophoneId && audioDevices.some(device => device.deviceId === savedMicrophoneId)) {
+                    microSelect.value = savedMicrophoneId;
+                    await startMicrophone(savedMicrophoneId);
+                } else if (audioDevices.length > 0) {
+                    microSelect.value = audioDevices[0].deviceId;
+                    await startMicrophone(audioDevices[0].deviceId);
+                    localStorage.setItem("selectedMicrophoneId", audioDevices[0].deviceId); // Lưu micro mặc định
+                }
+            } catch (err) {
+                console.error("Không thể lấy danh sách micro:", err);
+                alert("Không thể lấy danh sách micro. Kiểm tra quyền & thiết bị!");
+            }
+        }
+
+        async function startMicrophone(deviceId) {
+            try {
+                if (window.currentStream) {
+                    window.currentStream.getTracks().forEach(track => track.stop());
+                }
+
+                window.currentStream = await navigator.mediaDevices.getUserMedia({
+                    audio: { deviceId: { exact: deviceId } },
+                    video: false
+                });
+
+                // Kết hợp stream audio với stream video (nếu có)
+                if (stream && stream.getVideoTracks().length > 0) {
+                    const combinedStream = new MediaStream();
+                    combinedStream.addTrack(stream.getVideoTracks()[0]);
+                    combinedStream.addTrack(window.currentStream.getAudioTracks()[0]);
+                    videoElement.srcObject = combinedStream;
+                    stream = combinedStream;
+                }
+
+                localStorage.setItem("selectedMicrophoneId", deviceId); // Lưu microphone đã chọn
+                micEnabled = true;
+                updateAudioStatus();
+                console.log("Microphone started successfully with deviceId:", deviceId);
+            } catch (err) {
+                console.error("Không thể mở micro:", err);
+                alert("Không thể mở micro. Kiểm tra quyền & thiết bị!");
+            }
+        }
+
+        function toggleAudio() {
+            if (stream && stream.getAudioTracks().length > 0) {
+                micEnabled = !micEnabled;
+                stream.getAudioTracks()[0].enabled = micEnabled;
+                document.querySelector(".btn-audio").innerText = micEnabled ? "🔇 Tắt Mic" : "🎙️ Bật Mic";
+            }
+        }
+
+        function toggleVideo() {
+            if (stream && stream.getVideoTracks().length > 0) {
+                camEnabled = !camEnabled;
+                stream.getVideoTracks()[0].enabled = camEnabled;
+                document.querySelector(".btn-video").innerText = camEnabled ? "📹 Tắt Camera" : "📷 Bật Camera";
+            }
+        }
+
+        function startMeeting() {
+            alert("Bắt đầu cuộc họp!");
+            // Chuyển hướng đến meeting-room
+            window.location.href = "meeting-room.html";
+        }
+
+        // Khi chọn camera mới, cập nhật luồng video
+        cameraSelect.addEventListener("change", function () {
+            startCamera(this.value);
+        });
+
+        // Khi chọn micro mới, cập nhật luồng audio
+        microSelect.addEventListener("change", function () {
+            startMicrophone(this.value);
+        });
+
+        function updateVideoStatus() {
+            const videoStatus = document.querySelector(".control-item:nth-child(2) .control-status");
+            if (videoStatus) {
+                videoStatus.textContent = camEnabled ? "✔" : "✕";
+                videoStatus.style.backgroundColor = camEnabled ? "#2EB62C" : "red";
+            }
+        }
+
+        function updateAudioStatus() {
+            const audioStatus = document.querySelector(".control-item:nth-child(1) .control-status");
+            if (audioStatus) {
+                audioStatus.textContent = micEnabled ? "✔" : "✕";
+                audioStatus.style.backgroundColor = micEnabled ? "#2EB62C" : "red";
+            }
+        }
+
+        // Khi tải trang, lấy danh sách camera và micro
+        document.addEventListener("DOMContentLoaded", getCameras);
+        document.addEventListener("DOMContentLoaded", initializeMicrophones);
+    </script>
+</body>
+</html>

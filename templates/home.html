@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zoom Workplace Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+        
+        body {
+            background-color: #f7f7f9;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .header {
+            background-color: #e4e4e7;
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .logo {
+            display: flex;
+            flex-direction: column;
+            margin-right: 20px;
+        }
+        
+        .logo-text {
+            font-weight: bold;
+            color: #333;
+            font-size: 14px;
+        }
+        
+        .workplace-text {
+            color: #333;
+            font-size: 14px;
+        }
+        
+        .nav-tabs {
+            display: flex;
+            margin-left: auto;
+        }
+        
+        .nav-tab {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 5px 15px;
+            cursor: pointer;
+            position: relative;
+        }
+        
+        .nav-tab.active {
+            color: #0b57d0;
+        }
+        
+        .nav-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background-color: #0b57d0;
+        }
+        
+        .tab-icon {
+            font-size: 20px;
+            margin-bottom: 3px;
+        }
+        
+        .tab-text {
+            font-size: 12px;
+        }
+        
+        .settings-icon {
+            margin-left: 20px;
+            cursor: pointer;
+        }
+        
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .actions-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            max-width: 600px;
+        }
+        
+        .action-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+        
+        .action-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 10px;
+            color: white;
+            font-size: 24px;
+        }
+
+        .action-link {
+            text-decoration: none;
+            color: inherit;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+
+        
+        .new-meeting-icon {
+            background-color: #0b57d0;
+        }
+        
+        .join-icon, .schedule-icon, .share-icon {
+            background-color: #0b57d0;
+        }
+        
+        .action-text {
+            font-size: 14px;
+            color: #333;
+        }
+        
+        .dropdown-arrow {
+            font-size: 10px;
+            margin-left: 5px;
+        }
+        
+        .get-started-panel {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 300px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 15px;
+        }
+        
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .panel-title {
+            display: flex;
+            align-items: center;
+            font-weight: bold;
+        }
+        
+        .rocket-icon {
+            color: #0b57d0;
+            margin-right: 5px;
+        }
+        
+        .collapse-icon {
+            cursor: pointer;
+        }
+        
+        .progress-bar {
+            height: 5px;
+            background-color: #e4e4e7;
+            border-radius: 5px;
+            margin-bottom: 5px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            width: 66%;
+            background-color: #0b57d0;
+            border-radius: 5px;
+        }
+        
+        .progress-text {
+            text-align: right;
+            font-size: 12px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="logo">
+            <span class="logo-text">zoom</span>
+            <span class="workplace-text">Workplace</span>
+        </div>  
+        
+        <nav class="nav-tabs">
+            <div class="nav-tab active">
+                <span class="tab-icon">&#127968;</span>
+                <span class="tab-text">Home</span>
+            </div>
+            <div class="nav-tab">
+                <span class="tab-icon">&#128187;</span>
+                <span class="tab-text">Meetings</span>
+            </div>
+            <div class="nav-tab">
+                <span class="tab-icon">&#128172;</span>
+                <span class="tab-text">Team Chat</span>
+            </div>
+            <div class="nav-tab">
+                <span class="tab-icon">&#128197;</span>
+                <span class="tab-text">Scheduler</span>
+            </div>
+            <div class="nav-tab">
+                <span class="tab-icon">&#128196;</span>
+                <span class="tab-text">Docs</span>
+            </div>  
+            <div class="nav-tab">
+                <span class="tab-icon">&#8230;</span>
+                <span class="tab-text">More</span>
+            </div>
+        </nav>
+        
+        <div class="settings-icon" aria-label="Settings">&#9881;</div>
+    </header>
+    
+    <main class="main-content">
+        <div class="actions-grid">
+            <div class="action-item">
+                <a href="/create_meeting" class="action-link">
+                    <div class="action-icon new-meeting-icon">&#128249;</div>
+                <span class="action-text">New meeting</span>
+                </a>
+            </div>
+            
+            <div class="action-item">
+                <a href="#" class="action-link">
+                    <div class="action-icon join-icon">&#10133;</div>
+                    <span class="action-text">Join</span>
+                </a>
+            </div>
+            
+            <div class="action-item">
+                <a href="#" class="action-link">
+                    <div class="action-icon schedule-icon">
+                        <div style="font-size: 14px; font-weight: bold;">19</div>
+                    </div>
+                    <span class="action-text">Schedule</span>
+                </a>
+            </div>
+            
+            <div class="action-item">
+                <a href="#" class="action-link">
+                    <div class="action-icon share-icon">&#8593;</div>
+                    <span class="action-text">Share screen</span>
+                </a>
+            </div>
+        </div>
+    </main>
+
+    </div>
+</body>
+</html>

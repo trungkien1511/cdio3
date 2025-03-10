@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zoom Workplace</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+        }
+        
+        body {
+            background-color: #000;
+            color: white;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 16px;
+            background-color: #000;
+            border-bottom: 1px solid #222;
+        }
+        
+        .zoom-logo {
+            display: flex;
+            align-items: center;
+        }
+        
+        .zoom-text {
+            font-size: 14px;
+            font-weight: bold;
+        }
+        
+        .workplace-text {
+            font-size: 18px;
+            font-weight: normal;
+        }
+        
+        .main-content {
+            flex: 1;
+            position: relative;
+            height: 650px;
+        }
+        
+        .footer {
+            display: flex;
+            background-color: #000;
+            display: flex;
+            justify-content: space-between;
+            border-top: 1px solid #222;
+            padding: 10px 16px;
+        }
+
+        .control-item-right {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .control-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 0 15px;
+            font-size: 12px;
+            position: relative;
+        }
+        
+        .control-icon-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .control-icon {
+            font-size: 24px;
+            cursor: pointer;
+        }
+        
+        .caret-up {
+            font-size: 12px;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+        
+        .caret-up.active {
+            transform: rotate(180deg);
+        }
+        
+        .control-text {
+            font-size: 12px;
+        }
+        
+        .control-badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background-color: #2EB62C;
+            color: white;
+            font-size: 10px;
+            padding: 0 4px;
+            border-radius: 8px;
+            min-width: 16px;
+            text-align: center;
+        }
+        
+        .end-btn, .record-btn {
+            background-color: #E71D36;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 5px 15px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .record-btn.recording {
+            background-color: #FF4500;
+        }
+        
+        #videoPreview {
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+        }
+
+        .video-menu, .audio-menu {
+            display: none;
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #222;
+            border: 1px solid #444;
+            border-radius: 5px;
+            padding: 10px;
+            z-index: 10;
+            min-width: 150px;
+        }
+
+        .video-menu.active, .audio-menu.active {
+            display: block;
+        }
+
+        .video-menu-item, .audio-menu-item {
+            padding: 8px 10px;
+            font-size: 12px;
+            color: #fff;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+
+        .video-menu-item:hover, .audio-menu-item:hover {
+            background-color: #333;
+        }
+
+        .video-menu-item.camera-option::before {
+            content: "📷 ";
+        }
+
+        .video-menu-item.screen-option::before {
+            content: "📤 ";
+        }
+
+        .audio-menu-item.microphone-option::before {
+            content: "🎙️ ";
+        }
+
+        .control-status {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background-color: red;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="zoom-logo">
+            <span class="zoom-text">zoom</span>
+            <span class="workplace-text">Workplace</span>
+        </div> 
+    </div>
+    
+    <div class="main-content">
+        <video id="videoPreview" autoplay playsinline></video>
+    </div>
+    
+    <div class="footer">
+        <div class="control-item-right">
+            <div class="control-item">
+                <div class="control-icon-wrapper">
+                    <div class="control-icon">🎤
+                        <div class="control-status"></div>
+                    </div>
+                    <div class="caret-up">▲</div>
+                </div>
+                <div class="control-text">Audio</div>
+                <div class="audio-menu">
+                    <!-- Menu sẽ được tạo động bằng JavaScript -->
+                </div>
+            </div>
+            
+            <div class="control-item">
+                <div class="control-icon-wrapper">
+                    <div class="control-icon">🎥
+                        <div class="control-status"></div>
+                    </div>
+                    <div class="caret-up">▲</div>
+                </div>
+                <div class="control-text">Video</div>
+                <div class="video-menu">
+                    <!-- Menu sẽ được tạo động bằng JavaScript -->
+                </div>
+            </div>
+
+            <div class="control-item">
+                <button class="record-btn" id="recordBtn">Bắt đầu ghi âm</button>
+                <div class="control-text">Ghi âm</div>
+            </div>
+        </div>
+        
+        <div class="control-item">
+            <button class="end-btn">End</button>
+        </div>
+    </div>
+
+    <script>
+        let micEnabled = true;
+        let camEnabled = true;
+        let isRecording = false;
+        let videoStream = null;
+        let audioStream = null;
+        let mediaRecorder = null;
+        let recordedChunks = [];
+        let videoElement = document.getElementById("videoPreview");
+        let videoDevices = [];
+        let audioDevices = [];
+        let recordBtn = document.getElementById("recordBtn");
+
+        document.addEventListener("DOMContentLoaded", async () => {
+            await initializeDevices();
+        });
+
+        async function initializeDevices() {
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                videoDevices = devices.filter(device => device.kind === "videoinput");
+                audioDevices = devices.filter(device => device.kind === "audioinput");
+
+                const videoMenu = document.querySelector(".video-menu");
+                videoMenu.innerHTML = "";
+                videoDevices.forEach((device, index) => {
+                    const menuItem = document.createElement("div");
+                    menuItem.classList.add("video-menu-item", "camera-option");
+                    menuItem.textContent = device.label || `Camera ${index + 1}`;
+                    menuItem.dataset.deviceId = device.deviceId;
+                    videoMenu.appendChild(menuItem);
+
+                    menuItem.addEventListener("click", async () => {
+                        await startVideoDevice(device.deviceId);
+                        localStorage.setItem("selectedCameraId", device.deviceId);
+                        toggleVideoMenu();
+                    });
+                });
+
+                const screenShareItem = document.createElement("div");
+                screenShareItem.classList.add("video-menu-item", "screen-option");
+                screenShareItem.textContent = "Chia sẻ màn hình";
+                videoMenu.appendChild(screenShareItem);
+
+                screenShareItem.addEventListener("click", async () => {
+                    await startScreenShare();
+                    localStorage.setItem("selectedCameraId", "screen");
+                    toggleVideoMenu();
+                });
+
+                const audioMenu = document.querySelector(".audio-menu");
+                audioMenu.innerHTML = "";
+                audioDevices.forEach((device, index) => {
+                    const menuItem = document.createElement("div");
+                    menuItem.classList.add("audio-menu-item", "microphone-option");
+                    menuItem.textContent = device.label || `Microphone ${index + 1}`;
+                    menuItem.dataset.deviceId = device.deviceId;
+                    audioMenu.appendChild(menuItem);
+
+                    menuItem.addEventListener("click", async () => {
+                        await startAudioDevice(device.deviceId);
+                        localStorage.setItem("selectedMicrophoneId", device.deviceId);
+                        toggleAudioMenu();
+                    });
+                });
+
+                const savedCameraId = localStorage.getItem("selectedCameraId");
+                const savedMicrophoneId = localStorage.getItem("selectedMicrophoneId");
+
+                if (savedCameraId === "screen") {
+                    await startScreenShare();
+                } else if (savedCameraId && videoDevices.some(device => device.deviceId === savedCameraId)) {
+                    await startVideoDevice(savedCameraId);
+                } else if (videoDevices.length > 0) {
+                    await startVideoDevice(videoDevices[0].deviceId);
+                    localStorage.setItem("selectedCameraId", videoDevices[0].deviceId);
+                }
+
+                if (savedMicrophoneId && audioDevices.some(device => device.deviceId === savedMicrophoneId)) {
+                    await startAudioDevice(savedMicrophoneId);
+                } else if (audioDevices.length > 0) {
+                    await startAudioDevice(audioDevices[0].deviceId);
+                    localStorage.setItem("selectedMicrophoneId", audioDevices[0].deviceId);
+                }
+            } catch (err) {
+                console.error("Lỗi khi lấy danh sách thiết bị:", err);
+                handleError("Không thể lấy danh sách thiết bị. Kiểm tra quyền & thiết bị!");
+            }
+        }
+
+        async function startVideoDevice(videoDeviceId) {
+            try {
+                if (videoStream) {
+                    videoStream.getTracks().forEach(track => track.stop());
+                }
+
+                const constraints = {};
+                if (videoDeviceId) {
+                    constraints.video = { deviceId: { exact: videoDeviceId }, width: 320, height: 200 };
+                } else {
+                    constraints.video = false;
+                }
+
+                if (constraints.video) {
+                    videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+                    if (audioStream) {
+                        const combinedStream = new MediaStream();
+                        combinedStream.addTrack(videoStream.getVideoTracks()[0]);
+                        combinedStream.addTrack(audioStream.getAudioTracks()[0]);
+                        videoElement.srcObject = combinedStream;
+                        videoStream = combinedStream;
+                    } else {
+                        videoElement.srcObject = videoStream;
+                    }
+                    camEnabled = true;
+                    updateVideoStatus();
+                    console.log("Video device started with videoId:", videoDeviceId);
+                }
+            } catch (err) {
+                console.error("Lỗi khi khởi động video:", err);
+                handleError("Không thể mở video. Kiểm tra quyền & thiết bị! Chi tiết: " + err.message);
+            }
+        }
+
+        async function startAudioDevice(audioDeviceId) {
+            try {
+                if (audioStream) {
+                    audioStream.getTracks().forEach(track => track.stop());
+                }
+
+                const constraints = {};
+                if (audioDeviceId) {
+                    constraints.audio = { deviceId: { exact: audioDeviceId } };
+                } else {
+                    constraints.audio = false;
+                }
+
+                if (constraints.audio) {
+                    audioStream = await navigator.mediaDevices.getUserMedia(constraints);
+                    if (videoStream) {
+                        const combinedStream = new MediaStream();
+                        combinedStream.addTrack(videoStream.getVideoTracks()[0]);
+                        combinedStream.addTrack(audioStream.getAudioTracks()[0]);
+                        videoElement.srcObject = combinedStream;
+                        audioStream = combinedStream;
+                    } else {
+                        videoElement.srcObject = audioStream;
+                    }
+                    micEnabled = true;
+                    updateAudioStatus();
+                    console.log("Audio device started with audioId:", audioDeviceId);
+                }
+            } catch (err) {
+                console.error("Lỗi khi khởi động audio:", err);
+                handleError("Không thể mở audio. Kiểm tra quyền & thiết bị! Chi tiết: " + err.message);
+            }
+        }
+
+        async function startScreenShare() {
+            try {
+                if (videoStream) {
+                    videoStream.getTracks().forEach(track => track.stop());
+                }
+                if (audioStream) {
+                    audioStream.getTracks().forEach(track => track.stop());
+                }
+                videoStream = null;
+                audioStream = null;
+                videoElement.srcObject = null;
+
+                videoStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: true,
+                    audio: false
+                });
+                videoElement.srcObject = videoStream;
+                camEnabled = true;
+                updateVideoStatus();
+                console.log("Screen sharing started");
+
+                videoStream.getVideoTracks()[0].onended = () => {
+                    camEnabled = false;
+                    updateVideoStatus();
+                    videoElement.srcObject = null;
+                    videoStream = null;
+                    console.log("Screen sharing ended");
+                };
+            } catch (err) {
+                console.error("Lỗi khi chia sẻ màn hình:", err);
+                handleError("Không thể chia sẻ màn hình. Kiểm tra quyền & thiết bị! Chi tiết: " + err.message);
+            }
+        }
+
+        function handleError(message) {
+            console.error(message);
+            alert(message);
+        }
+
+        function updateVideoStatus() {
+            const videoStatus = document.querySelector(".control-item:nth-child(2) .control-status");
+            if (videoStatus) {
+                videoStatus.textContent = camEnabled ? "✔" : "✕";
+                videoStatus.style.backgroundColor = camEnabled ? "#2EB62C" : "red";
+            }
+        }
+
+        function updateAudioStatus() {
+            const audioStatus = document.querySelector(".control-item:nth-child(1) .control-status");
+            if (audioStatus) {
+                audioStatus.textContent = micEnabled ? "✔" : "✕";
+                audioStatus.style.backgroundColor = micEnabled ? "#2EB62C" : "red";
+            }
+        }
+
+        function toggleVideo() {
+            if (videoStream && videoStream.getVideoTracks().length > 0) {
+                camEnabled = !camEnabled;
+                videoStream.getVideoTracks()[0].enabled = camEnabled;
+                updateVideoStatus();
+                console.log("Video toggled to:", camEnabled);
+            } else if (!camEnabled && videoDevices.length > 0) {
+                startVideoDevice(videoDevices[0].deviceId);
+                localStorage.setItem("selectedCameraId", videoDevices[0].deviceId);
+            }
+        }
+
+        function toggleVideoMenu() {
+            const videoMenu = document.querySelector(".video-menu");
+            const caret = document.querySelector(".control-item:nth-child(2) .caret-up");
+            videoMenu.classList.toggle("active");
+            caret.classList.toggle("active");
+        }
+
+        function toggleAudio() {
+            if (audioStream && audioStream.getAudioTracks().length > 0) {
+                micEnabled = !micEnabled;
+                audioStream.getAudioTracks()[0].enabled = micEnabled;
+                updateAudioStatus();
+                console.log("Audio toggled to:", micEnabled);
+            } else if (!micEnabled && audioDevices.length > 0) {
+                startAudioDevice(audioDevices[0].deviceId);
+                localStorage.setItem("selectedMicrophoneId", audioDevices[0].deviceId);
+            }
+        }
+
+        function toggleAudioMenu() {
+            const audioMenu = document.querySelector(".audio-menu");
+            const caret = document.querySelector(".control-item:nth-child(1) .caret-up");
+            audioMenu.classList.toggle("active");
+            caret.classList.toggle("active");
+        }
+
+        function toggleRecording() {
+            if (!audioStream) {
+                alert("Không có luồng âm thanh. Vui lòng bật micro trước!");
+                return;
+            }
+
+            if (!isRecording) {
+                recordedChunks = [];
+                mediaRecorder = new MediaRecorder(audioStream);
+
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        recordedChunks.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = async () => {
+                    const blob = new Blob(recordedChunks, { type: "audio/webm" });
+                    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+                    const fileName = `recording-${timestamp}.webm`;
+
+                    const formData = new FormData();
+                    formData.append("audio", blob, fileName);
+
+                    try {
+                        const response = await fetch("http://127.0.0.1:5000/upload", {
+                            method: "POST",
+                            body: formData
+                        });
+
+                        if (response.ok) {
+                            console.log("Ghi âm đã được lưu:", fileName);
+                            alert("Ghi âm đã được lưu vào UI_CDIO3/uploads!");
+                        } else {
+                            throw new Error("Lỗi khi lưu file ghi âm");
+                        }
+                    } catch (err) {
+                        console.error("Lỗi khi gửi file ghi âm:", err);
+                        alert("Không thể lưu file ghi âm. Vui lòng kiểm tra server!");
+                    }
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                recordBtn.textContent = "Dừng ghi âm";
+                recordBtn.classList.add("recording");
+                console.log("Bắt đầu ghi âm...");
+            } else {
+                mediaRecorder.stop();
+                isRecording = false;
+                recordBtn.textContent = "Bắt đầu ghi âm";
+                recordBtn.classList.remove("recording");
+                console.log("Dừng ghi âm.");
+            }
+        }
+
+        recordBtn.addEventListener("click", toggleRecording);
+
+        document.querySelector(".control-item:nth-child(2) .control-icon").addEventListener("click", toggleVideo);
+        document.querySelector(".control-item:nth-child(1) .control-icon").addEventListener("click", toggleAudio);
+
+        document.querySelector(".control-item:nth-child(2) .caret-up").addEventListener("click", toggleVideoMenu);
+        document.querySelector(".control-item:nth-child(1) .caret-up").addEventListener("click", toggleAudioMenu);
+
+        document.addEventListener("click", (e) => {
+            const videoMenu = document.querySelector(".video-menu");
+            const audioMenu = document.querySelector(".audio-menu");
+            const videoCaret = document.querySelector(".control-item:nth-child(2) .caret-up");
+            const audioCaret = document.querySelector(".control-item:nth-child(1) .caret-up");
+            const videoControl = document.querySelector(".control-item:nth-child(2)");
+            const audioControl = document.querySelector(".control-item:nth-child(1)");
+            if (!videoControl.contains(e.target)) {
+                videoMenu.classList.remove("active");
+                videoCaret.classList.remove("active");
+            }
+            if (!audioControl.contains(e.target)) {
+                audioMenu.classList.remove("active");
+                audioCaret.classList.remove("active");
+            }
+        });
+    </script>
+</body>
+</html>
