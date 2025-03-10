@@ -112,7 +112,7 @@
             text-align: center;
         }
         
-        .end-btn, .record-btn {
+        .end-btn, .record-btn, .invite-btn {
             background-color: #E71D36;
             color: white;
             border: none;
@@ -187,6 +187,42 @@
             align-items: center;
             justify-content: center;
         }
+
+        .control-item-center {
+            display: flex;
+        }
+
+        .dropdown-menu {
+            display: none;
+            position: absolute;
+            bottom: 100%; /* Đặt phía trên nút "Mời" thay vì phía dưới */
+            left: 50%;
+            transform: translateX(-50%); /* Căn giữa dropdown */
+            background-color: #222; /* Đổi màu nền để phù hợp với giao diện tối */
+            color: white;
+            min-width: 250px;
+            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.3);
+            border-radius: 5px;
+            padding: 10px;
+            z-index: 100;
+        }
+
+        .dropdown-menu.active {
+            display: block;
+        }
+
+        .dropdown-menu a {
+            display: block;
+            text-decoration: none;
+            padding: 8px 12px;
+            color: #fff; /* Đổi màu chữ */
+            font-size: 12px;
+            border-radius: 3px;
+        }
+
+        .dropdown-menu a:hover {
+            background-color: #333;
+        }
     </style>
 </head>
 <body>
@@ -228,369 +264,359 @@
                     <!-- Menu sẽ được tạo động bằng JavaScript -->
                 </div>
             </div>
+        </div>
 
+        <div class="control-item-center" >
             <div class="control-item">
                 <button class="record-btn" id="recordBtn">Bắt đầu ghi âm</button>
-                <div class="control-text">Ghi âm</div>
             </div>
+            <div class="control-item">
+                <button class="invite-btn" id="inviteBtn">Mời ▲</button>
+                <div class="dropdown-menu" id="dropdownMenu">
+                    <a href="#" id="meetingLink" target="_blank">Tham gia cuộc họp</a>
+                </div>
+            </div>
+            
         </div>
         
+
         <div class="control-item">
             <button class="end-btn">End</button>
         </div>
     </div>
 
     <script>
-        let micEnabled = true;
-        let camEnabled = true;
-        let isRecording = false;
-        let videoStream = null;
-        let audioStream = null;
-        let mediaRecorder = null;
-        let recordedChunks = [];
-        let videoElement = document.getElementById("videoPreview");
-        let videoDevices = [];
-        let audioDevices = [];
-        let recordBtn = document.getElementById("recordBtn");
-
+        const roomId = "{{ room_id | safe }}"; // Đảm bảo truyền đúng room_id
+    </script>
+    
+    <script>
         document.addEventListener("DOMContentLoaded", async () => {
-            await initializeDevices();
-        });
-
-        async function initializeDevices() {
-            try {
-                const devices = await navigator.mediaDevices.enumerateDevices();
-                videoDevices = devices.filter(device => device.kind === "videoinput");
-                audioDevices = devices.filter(device => device.kind === "audioinput");
-
-                const videoMenu = document.querySelector(".video-menu");
-                videoMenu.innerHTML = "";
-                videoDevices.forEach((device, index) => {
-                    const menuItem = document.createElement("div");
-                    menuItem.classList.add("video-menu-item", "camera-option");
-                    menuItem.textContent = device.label || `Camera ${index + 1}`;
-                    menuItem.dataset.deviceId = device.deviceId;
-                    videoMenu.appendChild(menuItem);
-
-                    menuItem.addEventListener("click", async () => {
-                        await startVideoDevice(device.deviceId);
-                        localStorage.setItem("selectedCameraId", device.deviceId);
+            let micEnabled = true;
+            let camEnabled = true;
+            let isRecording = false;
+            let videoStream = null;
+            let audioStream = null;
+            let mediaRecorder = null;
+            let recordedChunks = [];
+            let videoElement = document.getElementById("videoPreview");
+            let videoDevices = [];
+            let audioDevices = [];
+            let recordBtn = document.getElementById("recordBtn");
+            let inviteBtn = document.getElementById("inviteBtn");
+            let dropdownMenu = document.getElementById("dropdownMenu");
+            let meetingLink = document.getElementById("meetingLink");
+    
+            async function initializeDevices() {
+                try {
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    videoDevices = devices.filter(device => device.kind === "videoinput");
+                    audioDevices = devices.filter(device => device.kind === "audioinput");
+    
+                    const videoMenu = document.querySelector(".video-menu");
+                    videoMenu.innerHTML = "";
+                    videoDevices.forEach((device, index) => {
+                        const menuItem = document.createElement("div");
+                        menuItem.classList.add("video-menu-item", "camera-option");
+                        menuItem.textContent = device.label || `Camera ${index + 1}`;
+                        menuItem.dataset.deviceId = device.deviceId;
+                        videoMenu.appendChild(menuItem);
+    
+                        menuItem.addEventListener("click", async () => {
+                            await startVideoDevice(device.deviceId);
+                            localStorage.setItem("selectedCameraId", device.deviceId);
+                            toggleVideoMenu();
+                        });
+                    });
+    
+                    const screenShareItem = document.createElement("div");
+                    screenShareItem.classList.add("video-menu-item", "screen-option");
+                    screenShareItem.textContent = "Chia sẻ màn hình";
+                    videoMenu.appendChild(screenShareItem);
+    
+                    screenShareItem.addEventListener("click", async () => {
+                        await startScreenShare();
+                        localStorage.setItem("selectedCameraId", "screen");
                         toggleVideoMenu();
                     });
-                });
-
-                const screenShareItem = document.createElement("div");
-                screenShareItem.classList.add("video-menu-item", "screen-option");
-                screenShareItem.textContent = "Chia sẻ màn hình";
-                videoMenu.appendChild(screenShareItem);
-
-                screenShareItem.addEventListener("click", async () => {
-                    await startScreenShare();
-                    localStorage.setItem("selectedCameraId", "screen");
-                    toggleVideoMenu();
-                });
-
-                const audioMenu = document.querySelector(".audio-menu");
-                audioMenu.innerHTML = "";
-                audioDevices.forEach((device, index) => {
-                    const menuItem = document.createElement("div");
-                    menuItem.classList.add("audio-menu-item", "microphone-option");
-                    menuItem.textContent = device.label || `Microphone ${index + 1}`;
-                    menuItem.dataset.deviceId = device.deviceId;
-                    audioMenu.appendChild(menuItem);
-
-                    menuItem.addEventListener("click", async () => {
-                        await startAudioDevice(device.deviceId);
-                        localStorage.setItem("selectedMicrophoneId", device.deviceId);
-                        toggleAudioMenu();
+    
+                    const audioMenu = document.querySelector(".audio-menu");
+                    audioMenu.innerHTML = "";
+                    audioDevices.forEach((device, index) => {
+                        const menuItem = document.createElement("div");
+                        menuItem.classList.add("audio-menu-item", "microphone-option");
+                        menuItem.textContent = device.label || `Microphone ${index + 1}`;
+                        menuItem.dataset.deviceId = device.deviceId;
+                        audioMenu.appendChild(menuItem);
+    
+                        menuItem.addEventListener("click", async () => {
+                            await startAudioDevice(device.deviceId);
+                            localStorage.setItem("selectedMicrophoneId", device.deviceId);
+                            toggleAudioMenu();
+                        });
                     });
-                });
-
-                const savedCameraId = localStorage.getItem("selectedCameraId");
-                const savedMicrophoneId = localStorage.getItem("selectedMicrophoneId");
-
-                if (savedCameraId === "screen") {
-                    await startScreenShare();
-                } else if (savedCameraId && videoDevices.some(device => device.deviceId === savedCameraId)) {
-                    await startVideoDevice(savedCameraId);
-                } else if (videoDevices.length > 0) {
-                    await startVideoDevice(videoDevices[0].deviceId);
-                    localStorage.setItem("selectedCameraId", videoDevices[0].deviceId);
+    
+                    const savedCameraId = localStorage.getItem("selectedCameraId");
+                    const savedMicrophoneId = localStorage.getItem("selectedMicrophoneId");
+    
+                    if (savedCameraId === "screen") {
+                        await startScreenShare();
+                    } else if (savedCameraId && videoDevices.some(device => device.deviceId === savedCameraId)) {
+                        await startVideoDevice(savedCameraId);
+                    } else if (videoDevices.length > 0) {
+                        await startVideoDevice(videoDevices[0].deviceId);
+                        localStorage.setItem("selectedCameraId", videoDevices[0].deviceId);
+                    }
+    
+                    if (savedMicrophoneId && audioDevices.some(device => device.deviceId === savedMicrophoneId)) {
+                        await startAudioDevice(savedMicrophoneId);
+                    } else if (audioDevices.length > 0) {
+                        await startAudioDevice(audioDevices[0].deviceId);
+                        localStorage.setItem("selectedMicrophoneId", audioDevices[0].deviceId);
+                    }
+                } catch (err) {
+                    console.error("Lỗi khi lấy danh sách thiết bị:", err);
+                    handleError("Không thể lấy danh sách thiết bị. Kiểm tra quyền & thiết bị!");
                 }
-
-                if (savedMicrophoneId && audioDevices.some(device => device.deviceId === savedMicrophoneId)) {
-                    await startAudioDevice(savedMicrophoneId);
-                } else if (audioDevices.length > 0) {
-                    await startAudioDevice(audioDevices[0].deviceId);
-                    localStorage.setItem("selectedMicrophoneId", audioDevices[0].deviceId);
-                }
-            } catch (err) {
-                console.error("Lỗi khi lấy danh sách thiết bị:", err);
-                handleError("Không thể lấy danh sách thiết bị. Kiểm tra quyền & thiết bị!");
             }
-        }
-
-        async function startVideoDevice(videoDeviceId) {
-            try {
-                // Dừng videoStream hiện tại nếu có
-                if (videoStream) {
-                    videoStream.getTracks().forEach(track => track.stop());
+    
+            async function startVideoDevice(videoDeviceId) {
+                try {
+                    if (videoStream) videoStream.getTracks().forEach(track => track.stop());
+                    const constraints = videoDeviceId ? { video: { deviceId: { exact: videoDeviceId }, width: 320, height: 200 } } : { video: false };
+                    if (constraints.video) {
+                        videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+                        videoElement.srcObject = videoStream;
+                        camEnabled = true;
+                        updateVideoStatus();
+                        console.log("Video device started with videoId:", videoDeviceId);
+                    }
+                } catch (err) {
+                    console.error("Lỗi khi khởi động video:", err);
+                    handleError("Không thể mở video. Kiểm tra quyền & thiết bị! Chi tiết: " + err.message);
                 }
-
-                const constraints = {};
-                if (videoDeviceId) {
-                    constraints.video = { deviceId: { exact: videoDeviceId }, width: 320, height: 200 };
-                } else {
-                    constraints.video = false;
+            }
+    
+            async function startAudioDevice(audioDeviceId) {
+                try {
+                    if (audioStream) audioStream.getTracks().forEach(track => track.stop());
+                    const constraints = audioDeviceId ? { audio: { deviceId: { exact: audioDeviceId } } } : { audio: false };
+                    if (constraints.audio) {
+                        audioStream = await navigator.mediaDevices.getUserMedia(constraints);
+                        micEnabled = true;
+                        updateAudioStatus();
+                        console.log("Audio device started with audioId:", audioDeviceId);
+                        if (isRecording && mediaRecorder) {
+                            mediaRecorder.stop();
+                            recordedChunks = [];
+                            mediaRecorder = new MediaRecorder(audioStream);
+                            mediaRecorder.ondataavailable = (event) => { if (event.data.size > 0) recordedChunks.push(event.data); };
+                            mediaRecorder.onstop = async () => {
+                                const blob = new Blob(recordedChunks, { type: "audio/webm" });
+                                const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+                                const fileName = `recording-${timestamp}.webm`;
+                                const formData = new FormData();
+                                formData.append("audio", blob, fileName);
+                                try {
+                                    const response = await fetch("http://127.0.0.1:5000/upload", { method: "POST", body: formData });
+                                    if (response.ok) {
+                                        console.log("Ghi âm đã được lưu:", fileName);
+                                        alert("Ghi âm đã được lưu vào UI_CDIO3/uploads!");
+                                    } else throw new Error("Lỗi khi lưu file ghi âm");
+                                } catch (err) {
+                                    console.error("Lỗi khi gửi file ghi âm:", err);
+                                    alert("Không thể lưu file ghi âm. Vui lòng kiểm tra server!");
+                                }
+                            };
+                            mediaRecorder.start();
+                            console.log("Đã cập nhật mediaRecorder với audioStream mới.");
+                        }
+                    }
+                } catch (err) {
+                    console.error("Lỗi khi khởi động audio:", err);
+                    handleError("Không thể mở audio. Kiểm tra quyền & thiết bị! Chi tiết: " + err.message);
                 }
-
-                if (constraints.video) {
-                    videoStream = await navigator.mediaDevices.getUserMedia(constraints);
-                    // Chỉ gán videoStream vào videoElement
+            }
+    
+            async function startScreenShare() {
+                try {
+                    if (videoStream) videoStream.getTracks().forEach(track => track.stop());
+                    videoStream = null;
+                    videoElement.srcObject = null;
+                    videoStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
                     videoElement.srcObject = videoStream;
                     camEnabled = true;
                     updateVideoStatus();
-                    console.log("Video device started with videoId:", videoDeviceId);
+                    console.log("Screen sharing started");
+                    videoStream.getVideoTracks()[0].onended = () => {
+                        camEnabled = false;
+                        updateVideoStatus();
+                        videoElement.srcObject = null;
+                        videoStream = null;
+                        console.log("Screen sharing ended");
+                    };
+                } catch (err) {
+                    console.error("Lỗi khi chia sẻ màn hình:", err);
+                    handleError("Không thể chia sẻ màn hình. Kiểm tra quyền & thiết bị! Chi tiết: " + err.message);
                 }
-            } catch (err) {
-                console.error("Lỗi khi khởi động video:", err);
-                handleError("Không thể mở video. Kiểm tra quyền & thiết bị! Chi tiết: " + err.message);
             }
-        }
-
-        async function startAudioDevice(audioDeviceId) {
-            try {
-                // Dừng audioStream hiện tại nếu có
-                if (audioStream) {
-                    audioStream.getTracks().forEach(track => track.stop());
-                }
-
-                const constraints = {};
-                if (audioDeviceId) {
-                    constraints.audio = { deviceId: { exact: audioDeviceId } };
-                } else {
-                    constraints.audio = false;
-                }
-
-                if (constraints.audio) {
-                    audioStream = await navigator.mediaDevices.getUserMedia(constraints);
-                    micEnabled = true;
-                    updateAudioStatus();
-                    console.log("Audio device started with audioId:", audioDeviceId);
-
-                    // Nếu đang ghi âm, cập nhật mediaRecorder với audioStream mới
-                    if (isRecording && mediaRecorder) {
-                        mediaRecorder.stop();
-                        recordedChunks = [];
-                        mediaRecorder = new MediaRecorder(audioStream);
-                        mediaRecorder.ondataavailable = (event) => {
-                            if (event.data.size > 0) {
-                                recordedChunks.push(event.data);
-                            }
-                        };
-                        mediaRecorder.onstop = async () => {
-                            const blob = new Blob(recordedChunks, { type: "audio/webm" });
-                            const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-                            const fileName = `recording-${timestamp}.webm`;
-
-                            const formData = new FormData();
-                            formData.append("audio", blob, fileName);
-
-                            try {
-                                const response = await fetch("http://127.0.0.1:5000/upload", {
-                                    method: "POST",
-                                    body: formData
-                                });
-
-                                if (response.ok) {
-                                    console.log("Ghi âm đã được lưu:", fileName);
-                                    alert("Ghi âm đã được lưu vào UI_CDIO3/uploads!");
-                                } else {
-                                    throw new Error("Lỗi khi lưu file ghi âm");
-                                }
-                            } catch (err) {
-                                console.error("Lỗi khi gửi file ghi âm:", err);
-                                alert("Không thể lưu file ghi âm. Vui lòng kiểm tra server!");
-                            }
-                        };
-                        mediaRecorder.start();
-                        console.log("Đã cập nhật mediaRecorder với audioStream mới.");
-                    }
-                }
-            } catch (err) {
-                console.error("Lỗi khi khởi động audio:", err);
-                handleError("Không thể mở audio. Kiểm tra quyền & thiết bị! Chi tiết: " + err.message);
+    
+            function handleError(message) {
+                console.error(message);
+                alert(message);
             }
-        }
-
-        async function startScreenShare() {
-            try {
-                if (videoStream) {
-                    videoStream.getTracks().forEach(track => track.stop());
+    
+            function updateVideoStatus() {
+                const videoStatus = document.querySelector(".control-item:nth-child(2) .control-status");
+                if (videoStatus) {
+                    videoStatus.textContent = camEnabled ? "✔" : "✕";
+                    videoStatus.style.backgroundColor = camEnabled ? "#2EB62C" : "red";
                 }
-                videoStream = null;
-                videoElement.srcObject = null;
-
-                videoStream = await navigator.mediaDevices.getDisplayMedia({
-                    video: true,
-                    audio: false
-                });
-                videoElement.srcObject = videoStream;
-                camEnabled = true;
-                updateVideoStatus();
-                console.log("Screen sharing started");
-
-                videoStream.getVideoTracks()[0].onended = () => {
-                    camEnabled = false;
+            }
+    
+            function updateAudioStatus() {
+                const audioStatus = document.querySelector(".control-item:nth-child(1) .control-status");
+                if (audioStatus) {
+                    audioStatus.textContent = micEnabled ? "✔" : "✕";
+                    audioStatus.style.backgroundColor = micEnabled ? "#2EB62C" : "red";
+                }
+            }
+    
+            function toggleVideo() {
+                if (videoStream && videoStream.getVideoTracks().length > 0) {
+                    camEnabled = !camEnabled;
+                    videoStream.getVideoTracks()[0].enabled = camEnabled;
                     updateVideoStatus();
-                    videoElement.srcObject = null;
-                    videoStream = null;
-                    console.log("Screen sharing ended");
-                };
-            } catch (err) {
-                console.error("Lỗi khi chia sẻ màn hình:", err);
-                handleError("Không thể chia sẻ màn hình. Kiểm tra quyền & thiết bị! Chi tiết: " + err.message);
+                    console.log("Video toggled to:", camEnabled);
+                } else if (!camEnabled && videoDevices.length > 0) {
+                    startVideoDevice(videoDevices[0].deviceId);
+                    localStorage.setItem("selectedCameraId", videoDevices[0].deviceId);
+                }
             }
-        }
-
-        function handleError(message) {
-            console.error(message);
-            alert(message);
-        }
-
-        function updateVideoStatus() {
-            const videoStatus = document.querySelector(".control-item:nth-child(2) .control-status");
-            if (videoStatus) {
-                videoStatus.textContent = camEnabled ? "✔" : "✕";
-                videoStatus.style.backgroundColor = camEnabled ? "#2EB62C" : "red";
+    
+            function toggleVideoMenu() {
+                const videoMenu = document.querySelector(".video-menu");
+                const caret = document.querySelector(".control-item:nth-child(2) .caret-up");
+                videoMenu.classList.toggle("active");
+                caret.classList.toggle("active");
             }
-        }
-
-        function updateAudioStatus() {
-            const audioStatus = document.querySelector(".control-item:nth-child(1) .control-status");
-            if (audioStatus) {
-                audioStatus.textContent = micEnabled ? "✔" : "✕";
-                audioStatus.style.backgroundColor = micEnabled ? "#2EB62C" : "red";
+    
+            function toggleAudio() {
+                if (audioStream && audioStream.getAudioTracks().length > 0) {
+                    micEnabled = !micEnabled;
+                    audioStream.getAudioTracks()[0].enabled = micEnabled;
+                    updateAudioStatus();
+                    console.log("Audio toggled to:", micEnabled);
+                } else if (!micEnabled && audioDevices.length > 0) {
+                    startAudioDevice(audioDevices[0].deviceId);
+                    localStorage.setItem("selectedMicrophoneId", audioDevices[0].deviceId);
+                }
             }
-        }
-
-        function toggleVideo() {
-            if (videoStream && videoStream.getVideoTracks().length > 0) {
-                camEnabled = !camEnabled;
-                videoStream.getVideoTracks()[0].enabled = camEnabled;
-                updateVideoStatus();
-                console.log("Video toggled to:", camEnabled);
-            } else if (!camEnabled && videoDevices.length > 0) {
-                startVideoDevice(videoDevices[0].deviceId);
-                localStorage.setItem("selectedCameraId", videoDevices[0].deviceId);
+    
+            function toggleAudioMenu() {
+                const audioMenu = document.querySelector(".audio-menu");
+                const caret = document.querySelector(".control-item:nth-child(1) .caret-up");
+                audioMenu.classList.toggle("active");
+                caret.classList.toggle("active");
             }
-        }
-
-        function toggleVideoMenu() {
-            const videoMenu = document.querySelector(".video-menu");
-            const caret = document.querySelector(".control-item:nth-child(2) .caret-up");
-            videoMenu.classList.toggle("active");
-            caret.classList.toggle("active");
-        }
-
-        function toggleAudio() {
-            if (audioStream && audioStream.getAudioTracks().length > 0) {
-                micEnabled = !micEnabled;
-                audioStream.getAudioTracks()[0].enabled = micEnabled;
-                updateAudioStatus();
-                console.log("Audio toggled to:", micEnabled);
-            } else if (!micEnabled && audioDevices.length > 0) {
-                startAudioDevice(audioDevices[0].deviceId);
-                localStorage.setItem("selectedMicrophoneId", audioDevices[0].deviceId);
-            }
-        }
-
-        function toggleAudioMenu() {
-            const audioMenu = document.querySelector(".audio-menu");
-            const caret = document.querySelector(".control-item:nth-child(1) .caret-up");
-            audioMenu.classList.toggle("active");
-            caret.classList.toggle("active");
-        }
-
-        function toggleRecording() {
-            if (!audioStream) {
-                alert("Không có luồng âm thanh. Vui lòng bật micro trước!");
-                return;
-            }
-
-            if (!isRecording) {
-                recordedChunks = [];
-                mediaRecorder = new MediaRecorder(audioStream);
-
-                mediaRecorder.ondataavailable = (event) => {
-                    if (event.data.size > 0) {
-                        recordedChunks.push(event.data);
-                    }
-                };
-
-                mediaRecorder.onstop = async () => {
-                    const blob = new Blob(recordedChunks, { type: "audio/webm" });
-                    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-                    const fileName = `recording-${timestamp}.webm`;
-
-                    const formData = new FormData();
-                    formData.append("audio", blob, fileName);
-
-                    try {
-                        const response = await fetch("http://127.0.0.1:5000/upload", {
-                            method: "POST",
-                            body: formData
-                        });
-
-                        if (response.ok) {
-                            console.log("Ghi âm đã được lưu:", fileName);
-                            alert("Ghi âm đã được lưu vào UI_CDIO3/uploads!");
-                        } else {
-                            throw new Error("Lỗi khi lưu file ghi âm");
+    
+            function toggleRecording() {
+                if (!audioStream) {
+                    alert("Không có luồng âm thanh. Vui lòng bật micro trước!");
+                    return;
+                }
+    
+                if (!isRecording) {
+                    recordedChunks = [];
+                    mediaRecorder = new MediaRecorder(audioStream);
+                    mediaRecorder.ondataavailable = (event) => { if (event.data.size > 0) recordedChunks.push(event.data); };
+                    mediaRecorder.onstop = async () => {
+                        const blob = new Blob(recordedChunks, { type: "audio/webm" });
+                        const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+                        const fileName = `recording-${timestamp}.webm`;
+                        const formData = new FormData();
+                        formData.append("audio", blob, fileName);
+                        try {
+                            const response = await fetch("http://127.0.0.1:5000/upload", { method: "POST", body: formData });
+                            if (response.ok) {
+                                console.log("Ghi âm đã được lưu:", fileName);
+                                alert("Ghi âm đã được lưu vào UI_CDIO3/uploads!");
+                            } else throw new Error("Lỗi khi lưu file ghi âm");
+                        } catch (err) {
+                            console.error("Lỗi khi gửi file ghi âm:", err);
+                            alert("Không thể lưu file ghi âm. Vui lòng kiểm tra server!");
                         }
-                    } catch (err) {
-                        console.error("Lỗi khi gửi file ghi âm:", err);
-                        alert("Không thể lưu file ghi âm. Vui lòng kiểm tra server!");
+                    };
+                    mediaRecorder.start();
+                    isRecording = true;
+                    recordBtn.textContent = "Dừng ghi âm";
+                    recordBtn.classList.add("recording");
+                    console.log("Bắt đầu ghi âm...");
+                } else {
+                    mediaRecorder.stop();
+                    isRecording = false;
+                    recordBtn.textContent = "Bắt đầu ghi âm";
+                    recordBtn.classList.remove("recording");
+                    console.log("Dừng ghi âm.");
+                }
+            }
+    
+            function toggleDropdown() {
+                console.log("Toggling dropdown...");
+                dropdownMenu.classList.toggle("active");
+                const caret = inviteBtn.textContent.includes("▲") ? "▼" : "▲";
+                inviteBtn.innerHTML = `Mời ${caret}`;
+                console.log("Dropdown active:", dropdownMenu.classList.contains("active"));
+            }
+    
+            function generateMeetingLink() {
+                try {
+                    if (!roomId) {
+                        throw new Error("Không tìm thấy room_id");
                     }
-                };
-
-                mediaRecorder.start();
-                isRecording = true;
-                recordBtn.textContent = "Dừng ghi âm";
-                recordBtn.classList.add("recording");
-                console.log("Bắt đầu ghi âm...");
-            } else {
-                mediaRecorder.stop();
-                isRecording = false;
-                recordBtn.textContent = "Bắt đầu ghi âm";
-                recordBtn.classList.remove("recording");
-                console.log("Dừng ghi âm.");
+                    const host = window.location.host || "127.0.0.1:5000";
+                    const meetingUrl = `http://${host}/meeting/${roomId}`;
+                    meetingLink.href = meetingUrl;
+                    meetingLink.textContent = `Tham gia cuộc họp: ${meetingUrl}`;
+                } catch (err) {
+                    console.error("Lỗi khi tạo link cuộc họp:", err);
+                    meetingLink.href = "#";
+                    meetingLink.textContent = "Lỗi: Không tạo được link";
+                }
             }
-        }
-
-        recordBtn.addEventListener("click", toggleRecording);
-
-        document.querySelector(".control-item:nth-child(2) .control-icon").addEventListener("click", toggleVideo);
-        document.querySelector(".control-item:nth-child(1) .control-icon").addEventListener("click", toggleAudio);
-
-        document.querySelector(".control-item:nth-child(2) .caret-up").addEventListener("click", toggleVideoMenu);
-        document.querySelector(".control-item:nth-child(1) .caret-up").addEventListener("click", toggleAudioMenu);
-
-        document.addEventListener("click", (e) => {
-            const videoMenu = document.querySelector(".video-menu");
-            const audioMenu = document.querySelector(".audio-menu");
-            const videoCaret = document.querySelector(".control-item:nth-child(2) .caret-up");
-            const audioCaret = document.querySelector(".control-item:nth-child(1) .caret-up");
-            const videoControl = document.querySelector(".control-item:nth-child(2)");
-            const audioControl = document.querySelector(".control-item:nth-child(1)");
-            if (!videoControl.contains(e.target)) {
-                videoMenu.classList.remove("active");
-                videoCaret.classList.remove("active");
-            }
-            if (!audioControl.contains(e.target)) {
-                audioMenu.classList.remove("active");
-                audioCaret.classList.remove("active");
-            }
+    
+            await initializeDevices();
+            generateMeetingLink();
+    
+            recordBtn.addEventListener("click", toggleRecording);
+            document.querySelector(".control-item:nth-child(2) .control-icon").addEventListener("click", toggleVideo);
+            document.querySelector(".control-item:nth-child(1) .control-icon").addEventListener("click", toggleAudio);
+            document.querySelector(".control-item:nth-child(2) .caret-up").addEventListener("click", toggleVideoMenu);
+            document.querySelector(".control-item:nth-child(1) .caret-up").addEventListener("click", toggleAudioMenu);
+            inviteBtn.addEventListener("click", toggleDropdown);
+    
+            document.addEventListener("click", (e) => {
+                const videoMenu = document.querySelector(".video-menu");
+                const audioMenu = document.querySelector(".audio-menu");
+                const dropdownMenu = document.getElementById("dropdownMenu");
+                const videoCaret = document.querySelector(".control-item:nth-child(2) .caret-up");
+                const audioCaret = document.querySelector(".control-item:nth-child(1) .caret-up");
+                const videoControl = document.querySelector(".control-item:nth-child(2)");
+                const audioControl = document.querySelector(".control-item:nth-child(1)");
+                const inviteControl = document.querySelector(".control-item-center .control-item:nth-child(2)");
+    
+                if (!videoControl.contains(e.target)) {
+                    videoMenu.classList.remove("active");
+                    videoCaret.classList.remove("active");
+                }
+                if (!audioControl.contains(e.target)) {
+                    audioMenu.classList.remove("active");
+                    audioCaret.classList.remove("active");
+                }
+                if (!inviteControl.contains(e.target) && !dropdownMenu.contains(e.target)) {
+                    dropdownMenu.classList.remove("active");
+                    inviteBtn.innerHTML = "Mời ▲";
+                }
+            });
         });
     </script>
 </body>
