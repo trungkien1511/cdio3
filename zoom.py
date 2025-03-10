@@ -1,5 +1,6 @@
 from flask import Flask, render_template, redirect, url_for, request
 import os
+import subprocess
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "supersecretkey"
@@ -37,7 +38,6 @@ if not os.path.exists(UPLOAD_FOLDER):
 
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
-# Route để xử lý upload file
 @app.route("/upload", methods=["POST"])
 def upload_file():
     if "audio" not in request.files:
@@ -47,10 +47,22 @@ def upload_file():
     if file.filename == "":
         return "Không có file được chọn!", 400
 
-    # Lưu file vào thư mục uploads
-    file_path = os.path.join(app.config["UPLOAD_FOLDER"], file.filename)
-    file.save(file_path)
-    return "File đã được lưu thành công!", 200
+    # Lưu file gốc (.webm)
+    webm_path = os.path.join(app.config["UPLOAD_FOLDER"], file.filename)
+    file.save(webm_path)
+
+    # Chuyển đổi sang .wav bằng ffmpeg với đường dẫn tuyệt đối
+    ffmpeg_path = r"C:\Users\Trung Kien\OneDrive\Downloads\ffmpeg-2025-03-06-git-696ea1c223-full_build\bin\ffmpeg.exe"
+    wav_filename = file.filename.replace(".webm", ".wav")
+    wav_path = os.path.join(app.config["UPLOAD_FOLDER"], wav_filename)
+    subprocess.run([
+        ffmpeg_path, "-i", webm_path, "-ar", "16000", "-ac", "1", wav_path
+    ], check=True)
+
+    # Xóa file .webm nếu không cần
+    os.remove(webm_path)
+
+    return "File đã được chuyển đổi và lưu thành công dưới dạng .wav!", 200
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)

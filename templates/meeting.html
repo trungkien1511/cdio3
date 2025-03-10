@@ -192,7 +192,7 @@
 <body>
     <div class="header">
         <div class="zoom-logo">
-            <span class="zoom-text">zoom</span>
+            <span class="zoom-text">CDIO 3</span>
             <span class="workplace-text">Workplace</span>
         </div> 
     </div>
@@ -332,6 +332,7 @@
 
         async function startVideoDevice(videoDeviceId) {
             try {
+                // Dừng videoStream hiện tại nếu có
                 if (videoStream) {
                     videoStream.getTracks().forEach(track => track.stop());
                 }
@@ -345,15 +346,8 @@
 
                 if (constraints.video) {
                     videoStream = await navigator.mediaDevices.getUserMedia(constraints);
-                    if (audioStream) {
-                        const combinedStream = new MediaStream();
-                        combinedStream.addTrack(videoStream.getVideoTracks()[0]);
-                        combinedStream.addTrack(audioStream.getAudioTracks()[0]);
-                        videoElement.srcObject = combinedStream;
-                        videoStream = combinedStream;
-                    } else {
-                        videoElement.srcObject = videoStream;
-                    }
+                    // Chỉ gán videoStream vào videoElement
+                    videoElement.srcObject = videoStream;
                     camEnabled = true;
                     updateVideoStatus();
                     console.log("Video device started with videoId:", videoDeviceId);
@@ -366,6 +360,7 @@
 
         async function startAudioDevice(audioDeviceId) {
             try {
+                // Dừng audioStream hiện tại nếu có
                 if (audioStream) {
                     audioStream.getTracks().forEach(track => track.stop());
                 }
@@ -379,18 +374,48 @@
 
                 if (constraints.audio) {
                     audioStream = await navigator.mediaDevices.getUserMedia(constraints);
-                    if (videoStream) {
-                        const combinedStream = new MediaStream();
-                        combinedStream.addTrack(videoStream.getVideoTracks()[0]);
-                        combinedStream.addTrack(audioStream.getAudioTracks()[0]);
-                        videoElement.srcObject = combinedStream;
-                        audioStream = combinedStream;
-                    } else {
-                        videoElement.srcObject = audioStream;
-                    }
                     micEnabled = true;
                     updateAudioStatus();
                     console.log("Audio device started with audioId:", audioDeviceId);
+
+                    // Nếu đang ghi âm, cập nhật mediaRecorder với audioStream mới
+                    if (isRecording && mediaRecorder) {
+                        mediaRecorder.stop();
+                        recordedChunks = [];
+                        mediaRecorder = new MediaRecorder(audioStream);
+                        mediaRecorder.ondataavailable = (event) => {
+                            if (event.data.size > 0) {
+                                recordedChunks.push(event.data);
+                            }
+                        };
+                        mediaRecorder.onstop = async () => {
+                            const blob = new Blob(recordedChunks, { type: "audio/webm" });
+                            const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+                            const fileName = `recording-${timestamp}.webm`;
+
+                            const formData = new FormData();
+                            formData.append("audio", blob, fileName);
+
+                            try {
+                                const response = await fetch("http://127.0.0.1:5000/upload", {
+                                    method: "POST",
+                                    body: formData
+                                });
+
+                                if (response.ok) {
+                                    console.log("Ghi âm đã được lưu:", fileName);
+                                    alert("Ghi âm đã được lưu vào UI_CDIO3/uploads!");
+                                } else {
+                                    throw new Error("Lỗi khi lưu file ghi âm");
+                                }
+                            } catch (err) {
+                                console.error("Lỗi khi gửi file ghi âm:", err);
+                                alert("Không thể lưu file ghi âm. Vui lòng kiểm tra server!");
+                            }
+                        };
+                        mediaRecorder.start();
+                        console.log("Đã cập nhật mediaRecorder với audioStream mới.");
+                    }
                 }
             } catch (err) {
                 console.error("Lỗi khi khởi động audio:", err);
@@ -403,11 +428,7 @@
                 if (videoStream) {
                     videoStream.getTracks().forEach(track => track.stop());
                 }
-                if (audioStream) {
-                    audioStream.getTracks().forEach(track => track.stop());
-                }
                 videoStream = null;
-                audioStream = null;
                 videoElement.srcObject = null;
 
                 videoStream = await navigator.mediaDevices.getDisplayMedia({
